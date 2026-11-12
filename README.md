@@ -1,236 +1,1007 @@
-# CarWash Queue
+# CarWash Queue - Group22
 
-ระบบจองคิวล้างรถที่เริ่มใหม่จากหน้า HTML เดิม โดยใช้ React + Tailwind CSS, Node.js + Express และ MySQL แทน Firebase
+## สมาชิกในกลุ่ม (Project Members)
 
-## โครงสร้าง
+| ลำดับ | รหัสนิสิต | ชื่อ - นามสกุล | บทบาทหน้าที่ความรับผิดชอบ |
+|:---:|:---:|:---|:---|
+| 1 | 6621601018 | นายปฏิภาณ อาจเพล | **Backend**|
+| 2 | 6621601166 | นายภูริพัฒน์ จันทร์อักษร | **UX/UI**|
+| 3 | 6621601271 | นายอนาวิล ย้อยแย้ม | **Fontend,Tester**|
 
-- `client` — React 18 + Vite + Tailwind CSS
-- `server` — Node.js 20 + Express 4 REST API
-- `database` — MySQL schema และ seed data
+**ลิงก์เว็บไซต์ที่ Deploy ใช้งานจริง:** `https://carwash.carcareku.tech/`
 
-## เริ่มต้นใช้งาน
+---
+### 1) ภาพรวมของระบบ (System Overview)
 
-1. สร้างฐานข้อมูล MySQL แล้วรัน `database/schema.sql` และ `database/seed.sql`
-2. คัดลอก `server/.env.example` เป็น `server/.env` แล้วใส่ค่าการเชื่อมต่อ MySQL
-3. ติดตั้ง dependencies ใน `client` และ `server`
-4. เปิด server ที่พอร์ต 3000 และ client ที่พอร์ต 5173
+### 1.1 ที่มาและปัญหาที่ระบบต้องการแก้ไข
 
-```powershell
-cd 'E:\IT PROJECT\Friday\server'
-npm install
-npm run dev
+ร้านล้างรถแบบเดิมมักรับลูกค้าแบบ walk-in หรือจองผ่านโทรศัพท์/แชต ซึ่งทำให้เกิดปัญหาดังนี้
 
-cd 'E:\IT PROJECT\Friday\client'
-npm install
-npm run dev
+1. ลูกค้าต้องรอคิวนาน เพราะไม่รู้ล่วงหน้าว่าช่วงไหนว่าง บางช่วงลูกค้ามากันจนแออัด แต่บางช่วงร้านว่าง
+2. การจัดคิวทำด้วยมือและผิดพลาดง่าย การจดคิวลงสมุดหรือรับจองทางโทรศัพท์อาจทำให้จองซ้ำช่วงเวลาเดียวกัน หรือข้อมูลรถและบริการตกหล่น
+3. ลูกค้าไม่รู้สถานะรถ ต้องโทรถามหรือมารอที่ร้านเองว่ารถล้างเสร็จหรือยัง
+4. ตรวจสอบการชำระเงินยาก พนักงานต้องดูสลิปโอนเงินทีละใบ เสี่ยงต่อสลิปปลอม สลิปซ้ำ หรือยอดเงินไม่ตรง
+5. ไม่มีข้อมูลลูกค้าและรายรับเป็นระบบ ร้านจึงวิเคราะห์ยอดขาย ดูประวัติลูกค้า หรือทำโปรแกรมสะสมแต้มได้ยาก
+6. การปรับบริการและราคาไม่สะดวก ทุกครั้งที่เปลี่ยนแพ็กเกจหรือราคา ต้องแจ้งลูกค้าเองทีละช่องทาง
+
+ระบบ CarWash Queue จึงถูกพัฒนาขึ้นเพื่อย้ายขั้นตอนตั้งแต่การจองคิว การชำระเงิน การติดตามสถานะ ไปจนถึงการบริหารจัดการร้าน มาไว้บนเว็บไซต์เดียว
+
+### 1.2 วัตถุประสงค์ของระบบ
+1. ให้ลูกค้าจองคิวล้างรถออนไลน์ได้ล่วงหน้า โดยเลือกวัน ช่วงเวลา บริการหลัก และบริการเสริมเองได้ พร้อมเห็นจำนวนคิวว่างแบบเรียลไทม์
+2. ป้องกันการจองซ้อนและจัดคิวให้เป็นระบบ ร้านเปิดวันจันทร์–เสาร์ เวลา 09:00–16:00 น. แบ่งเป็น 6 ช่วงเวลา ช่วงละ 1 คัน (เว้นช่วงพักเที่ยง) และระบบไม่รับจองวันอาทิตย์
+3. รองรับการชำระเงินทั้งพร้อมเพย์/QR Code ที่ระบบตรวจสลิปให้อัตโนมัติ (ตรวจ QR ยอดเงิน บัญชีผู้รับ และสลิปซ้ำ) และเงินสดที่ร้านซึ่งแอดมินเป็นผู้ยืนยัน โดยระบบคำนวณ VAT 7% ให้อัตโนมัติ
+4. ให้ลูกค้าติดตามสถานะรถได้เองผ่านแถบความคืบหน้า 4 ขั้น ซึ่งอัปเดตอัตโนมัติทุก 15 วินาที และมีการแจ้งเตือนเมื่อสถานะเปลี่ยน
+5. เพิ่มความยืดหยุ่นให้ลูกค้า โดยเลื่อนวัน/เวลา หรือยกเลิกการจองได้เอง
+6. สร้างความภักดีของลูกค้าด้วยระบบแต้มสะสม (ได้ 1 แต้มทุกยอดใช้จ่าย 25 บาท เมื่อบริการเสร็จสิ้น)
+7. ช่วยให้ร้านบริหารงานได้ง่ายขึ้นผ่านหน้าแอดมินสำหรับจัดการคิว ข้อมูลลูกค้า บริการและราคา รายงานรายรับ และข้อความจากลูกค้า
+### 1.3 กลุ่มผู้ใช้และบทบาทของแต่ละกลุ่ม
+
+| กลุ่มผู้ใช้ | บทบาทและสิทธิ์การใช้งาน |
+|---|---|
+| **ผู้เยี่ยมชมทั่วไป<br>(Guest)** | ดูหน้าแรก ขั้นตอนการจอง และบริการพร้อมราคาได้ แต่ต้องสมัครสมาชิกหรือเข้าสู่ระบบก่อนจึงจะจองคิว ดูประวัติ หรือติดตามสถานะได้ |
+| **ลูกค้า<br>(Customer)** | สมัครสมาชิกหรือเข้าสู่ระบบด้วยอีเมลหรือบัญชี Google, จองคิว, ชำระเงินด้วย QR พร้อมเพย์ (แนบสลิป) หรือเงินสด, ติดตามสถานะรถ, ดูประวัติการจอง, เลื่อนหรือยกเลิกการจอง, ดูโปรไฟล์และแต้มสะสม, รับการแจ้งเตือน และส่งข้อความถึงร้าน |
+| **ผู้ดูแลระบบ<br>(Admin)** | เข้าสู่ระบบผ่านหน้าเดียวกับลูกค้าแล้วระบบจะพาไปหน้า Admin Dashboard (`/admin`) เพื่อดู ค้นหา และกรองรายการจองทั้งหมด, ยืนยันการชำระเงิน (ตรวจผลสลิป/ยืนยันรับเงินสด), อัปเดตสถานะงาน (รับรถเข้าคิว → เริ่มให้บริการ → พร้อมรับรถ), ยกเลิกการจอง, ดูข้อมูลและประวัติลูกค้า, เพิ่ม/แก้ไข/ปิดบริการ, ดูรายงานรายรับ และอ่าน/จัดการข้อความจากลูกค้า |
+
+### 1.4 รายการฟังก์ชันหลักของระบบ
+
+#### ฝั่งลูกค้า
+
+| ลำดับ | ฟังก์ชัน | รายละเอียด |
+|:---:|---|---|
+| F01 | สมัครสมาชิก / เข้าสู่ระบบ | ใช้อีเมลและรหัสผ่าน หรือเข้าด้วยบัญชี Google |
+| F02 | ดูบริการและราคา | แพ็กเกจหลัก 3 แบบ (Standard Wash, Premium Wash, Full Detailing) และบริการเสริม เช่น เคลือบแก้วเซรามิก ขัดโคมไฟหน้า อบโอโซน ล้างห้องเครื่อง |
+| F03 | จองคิว | เลือกวันที่ ช่วงเวลา (แสดงคิวว่าง) บริการหลัก บริการเสริม กรอกข้อมูลลูกค้าและรถ พร้อมกล่องสรุปรายการจอง |
+| F04 | ชำระเงิน | คำนวณยอดรวม VAT 7% แล้วชำระผ่าน QR พร้อมเพย์ (ตรวจสลิปอัตโนมัติ) หรือเงินสดที่ร้าน และกลับมาชำระต่อภายหลังได้ |
+| F05 | ติดตามสถานะ | แถบความคืบหน้า 4 ขั้น: รอยืนยันการจอง → รับรถเข้าคิวแล้ว → กำลังให้บริการ → พร้อมรับรถแล้ว |
+| F06 | รายการของฉัน | ดูประวัติการจอง ค้นหา/กรองตามสถานะหรือวันที่ ดูรายละเอียด เลื่อนวันและเวลา หรือยกเลิกการจอง |
+| F07 | โปรไฟล์และแต้มสะสม | ดูข้อมูลส่วนตัวและแต้มสะสมที่ได้จากการใช้บริการ |
+| F08 | การแจ้งเตือน | แจ้งเตือนผ่านไอคอนกระดิ่งเมื่อสถานะการจองหรือการชำระเงินเปลี่ยน |
+| F09 | ติดต่อเรา | ส่งข้อความถึงร้านตามหัวข้อ (สอบถามบริการ/การจอง, แจ้งปัญหา, ข้อเสนอแนะ) แนบรูปหรือ PDF ได้ไม่เกิน 5 MB |
+
+#### ฝั่งผู้ดูแลระบบ
+
+| ลำดับ | ฟังก์ชัน | รายละเอียด |
+|:---:|---|---|
+| A01 | จัดการรายการจอง | ตารางการจองทั้งหมด ค้นหาด้วยรหัสจอง ชื่อ หรือทะเบียนรถ กรองตามสถานะการจอง สถานะการชำระเงิน และวันที่ |
+| A02 | ยืนยันการชำระเงิน | ดูสลิปและประวัติผลตรวจ (ผ่าน/ไม่ผ่าน เหตุผล ยอดเงิน Reference ID) และกดยืนยันรับเงินสด |
+| A03 | อัปเดตสถานะงาน | รับรถเข้าคิว → เริ่มให้บริการ → พร้อมรับรถ หรือยกเลิกการจองก่อนจบงาน |
+| A04 | ข้อมูลลูกค้า | รายชื่อ ข้อมูลติดต่อ แต้มสะสม จำนวนการจอง และประวัติการใช้บริการรายบุคคล |
+| A05 | จัดการบริการและราคา | เพิ่ม แก้ไข และเปิด/ปิดบริการหลักและบริการเสริม (ราคาใหม่มีผลกับการจองใหม่เท่านั้น) |
+| A06 | รายงานรายรับ | สรุปยอดรับชำระรวม VAT, ยอดก่อน VAT, รายรับรายวัน, รายรับแยกตามบริการ และรายการรับชำระรายตัว ตามช่วงวันที่ที่เลือก |
+| A07 | จัดการข้อความ | อ่าน ค้นหา และกรองข้อความตามสถานะ (ยังไม่อ่าน/อ่านแล้ว/เก็บถาวร) และลบข้อความ |
+| A08 | การแจ้งเตือนแอดมิน | แจ้งเมื่อมีการจองใหม่ ยืนยันการชำระเงินแล้ว สลิปไม่ผ่านการตรวจ หรือสถานะงานเปลี่ยน |
+
+---
+### 2) โครงสร้างของระบบ (System Architecture)
+
+### 2.1 แผนภาพสถาปัตยกรรมระบบ
+
+แสดงส่วนประกอบหลักและการเชื่อมต่อของระบบ ตั้งแต่ **Client → Frontend → Backend / API → Database** รวมถึงบริการภายนอก
+
+```mermaid
+flowchart TB
+    %% ===== Client =====
+    subgraph CLIENT[" Client Layer"]
+        direction LR
+        C1["ลูกค้า<br/>Web / Mobile Browser"]
+        C2["แอดมิน<br/>Web Browser"]
+    end
+
+    %% ===== Frontend =====
+    subgraph FE[" Frontend (Web Application)"]
+        direction TB
+        subgraph FE_C["หน้าสำหรับลูกค้า"]
+            F1["หน้าแรก / บริการและราคา"]
+            F2["จองคิว"]
+            F3["ชำระเงิน<br/>QR พร้อมเพย์ / เงินสด"]
+            F4["ติดตามสถานะ<br/>auto refresh ทุก 15 วินาที"]
+            F5["รายการของฉัน<br/>เลื่อน / ยกเลิกคิว"]
+            F6["โปรไฟล์ / แต้มสะสม / แจ้งเตือน"]
+            F7["ติดต่อเรา"]
+        end
+        subgraph FE_A["Admin Dashboard /admin"]
+            A1["รายการจอง<br/>ยืนยันชำระเงิน / อัปเดตสถานะงาน"]
+            A2["ข้อมูลลูกค้า"]
+            A3["บริการและราคา"]
+            A4["รายรับ"]
+            A5["ข้อความ"]
+        end
+    end
+
+    %% ===== Backend =====
+    subgraph BE[" Backend / REST API"]
+        direction TB
+        GW["API Gateway / Router<br/>HTTPS + Role-based Access<br/>customer / admin"]
+        AUTH["Auth Service<br/>สมัคร / เข้าสู่ระบบ / เปลี่ยนรหัสผ่าน"]
+        BOOK["Booking Service<br/>ตรวจคิวว่าง 1 คันต่อช่วงเวลา<br/>จันทร์-เสาร์ 09:00-16:00"]
+        PAY["Payment Service<br/>VAT 7% / QR PromptPay<br/>เงินสด / ตรวจสลิป"]
+        CAT["Service Catalog<br/>บริการหลัก / บริการเสริม"]
+        LOYAL["Loyalty Service<br/>1 แต้มต่อ 25 บาท เมื่อบริการเสร็จ"]
+        NOTI["Notification Service<br/>แจ้งเตือนลูกค้า / แอดมิน"]
+        MSG["Contact Message Service<br/>รับข้อความ + ไฟล์แนบ"]
+        REP["Reporting Service<br/>รายรับรายวัน / แยกตามบริการ"]
+    end
+
+    %% ===== Data =====
+    subgraph DATA[" Data Layer"]
+        DB[("Database<br/>users, vehicles, bookings,<br/>services, booking_addons, payments,<br/>slip_checks, point_transactions,<br/>notifications, contact_messages")]
+        FS[("File Storage<br/>รูปสลิป / ไฟล์แนบ<br/>JPG PNG WEBP PDF ไม่เกิน 5 MB")]
+    end
+
+    %% ===== External =====
+    subgraph EXT[" External Services"]
+        GOOGLE["Google OAuth<br/>ดำเนินการต่อโดยใช้ Google"]
+        SLIP["Slip Verification API<br/>ตรวจ QR บนสลิป ยอดเงิน<br/>บัญชีผู้รับ และสลิปซ้ำ"]
+        BANK["แอปธนาคาร<br/>PromptPay โอนเงิน"]
+    end
+
+    %% ===== Connections =====
+    C1 -->|HTTPS| FE_C
+    C2 -->|HTTPS| FE_A
+    FE_C -->|REST API / JSON| GW
+    FE_A -->|REST API / JSON| GW
+
+    GW --> AUTH
+    GW --> BOOK
+    GW --> PAY
+    GW --> CAT
+    GW --> LOYAL
+    GW --> NOTI
+    GW --> MSG
+    GW --> REP
+
+    BOOK --> CAT
+    BOOK --> NOTI
+    BOOK --> LOYAL
+    PAY --> BOOK
+    PAY --> NOTI
+
+    AUTH --> DB
+    BOOK --> DB
+    PAY --> DB
+    CAT --> DB
+    LOYAL --> DB
+    NOTI --> DB
+    MSG --> DB
+    REP --> DB
+
+    PAY --> FS
+    MSG --> FS
+
+    AUTH <-->|OAuth 2.0| GOOGLE
+    PAY <-->|ส่งรูปสลิป / รับผลตรวจ| SLIP
+    C1 -.->|สแกน QR แล้วโอนเงิน| BANK
+    SLIP -.->|ตรวจสอบรายการโอนกับธนาคาร| BANK
+```
+---
+
+### 2.2 โครงสร้างโฟลเดอร์ของโปรเจกต์
+
+```mermaid
+flowchart LR
+    ROOT["car-wash-project<br/>ระบบจองคิวล้างรถออนไลน์"]
+
+    %% ================= ROOT FILES =================
+    ROOT --> R1[".gitignore<br/>ไฟล์ที่ไม่นำขึ้น Git"]
+    ROOT --> R2[".keep<br/>ไฟล์เปล่าเพื่อเก็บโฟลเดอร์"]
+    ROOT --> R3["docker-compose.yml<br/>รันทุก service ตอนพัฒนา"]
+    ROOT --> R4["docker-compose.production.yml<br/>ตั้งค่า Docker สำหรับ production"]
+    ROOT --> R5["README.md<br/>เอกสารอธิบายโปรเจกต์"]
+
+    %% ================= .github =================
+    ROOT --> GH["📁 .github"]
+    GH --> GHW["📁 workflows<br/>GitHub Actions"]
+    GHW --> GHW1["deploy.yml<br/>CI/CD deploy อัตโนมัติ"]
+
+    %% ================= client =================
+    ROOT --> CL["📁 client<br/>Frontend: React + Vite + Tailwind"]
+    CL --> CL1[".dockerignore<br/>ไฟล์ที่ไม่ใส่ใน Docker image"]
+    CL --> CL2[".env.example<br/>ตัวอย่างตัวแปรสภาพแวดล้อม"]
+    CL --> CL3["Dockerfile<br/>build image ฝั่งหน้าเว็บ"]
+    CL --> CL4["index.html<br/>หน้า HTML หลักของแอป"]
+    CL --> CL5["nginx.conf<br/>เสิร์ฟไฟล์เว็บใน container"]
+    CL --> CL6["package.json<br/>รายการ dependencies และ scripts"]
+    CL --> CL7["package-lock.json<br/>ล็อกเวอร์ชัน dependencies"]
+    CL --> CL8["postcss.config.js<br/>ตั้งค่า PostCSS"]
+    CL --> CL9["tailwind.config.js<br/>ตั้งค่า Tailwind CSS"]
+    CL --> CL10["vercel.json<br/>ตั้งค่า deploy บน Vercel"]
+    CL --> CL11["vite.config.js<br/>ตั้งค่า Vite build tool"]
+
+    CL --> PUB["📁 public"]
+    PUB --> IMG["📁 images<br/>รูปภาพที่ใช้ในเว็บ"]
+    IMG --> IMG1["car-wash-1 ถึง 4.png<br/>รูปประกอบหน้าเว็บ"]
+    IMG --> IMG2["cash-payment.png<br/>ไอคอนชำระเงินสด"]
+    IMG --> IMG3["slip2go-logo.png<br/>โลโก้ระบบตรวจสลิป"]
+
+    CL --> SRC["📁 src<br/>ซอร์สโค้ดหน้าเว็บ"]
+    SRC --> S1["main.jsx<br/>จุดเริ่มต้นแอป React"]
+    SRC --> S2["App.jsx<br/>กำหนด routes ของแต่ละหน้า"]
+    SRC --> S3["api.js<br/>ฟังก์ชันเรียก Backend API"]
+    SRC --> S4["auth.jsx<br/>จัดการสถานะล็อกอิน"]
+    SRC --> S5["index.css<br/>สไตล์หลักและ Tailwind"]
+
+    SRC --> COMP["📁 components<br/>คอมโพเนนต์ที่ใช้ซ้ำ"]
+    COMP --> CO1["GoogleSignInButton.jsx<br/>ปุ่มเข้าสู่ระบบด้วย Google"]
+    COMP --> CO2["Icons.jsx<br/>รวมไอคอน SVG"]
+    COMP --> CO3["Layout.jsx<br/>โครงหน้า header / footer"]
+    COMP --> CO4["RouteGuards.jsx<br/>ป้องกันหน้าที่ต้องล็อกอิน / admin"]
+
+    SRC --> PG["📁 pages<br/>หน้าต่าง ๆ ของเว็บ"]
+    PG --> PG1["HomePage.jsx<br/>หน้าแรก"]
+    PG --> PG2["ServicesPage.jsx<br/>รายการบริการและราคา"]
+    PG --> PG3["BookingPage.jsx<br/>จองคิวล้างรถ"]
+    PG --> PG4["PaymentPage.jsx<br/>ชำระเงิน / แนบสลิป"]
+    PG --> PG5["StatusPage.jsx<br/>สถานะการจอง"]
+    PG --> PG6["TrackingPage.jsx<br/>ติดตามคิว"]
+    PG --> PG7["NotificationsPage.jsx<br/>การแจ้งเตือน"]
+    PG --> PG8["ProfilePage.jsx<br/>โปรไฟล์และแต้มสะสม"]
+    PG --> PG9["ContactPage.jsx<br/>ติดต่อร้าน / แนบไฟล์"]
+    PG --> PG10["AuthPage.jsx<br/>สมัครสมาชิก / เข้าสู่ระบบ"]
+    PG --> PG11["AdminPage.jsx<br/>แผงควบคุมผู้ดูแลระบบ"]
+
+    SRC --> CUT["📁 utils<br/>ฟังก์ชันช่วยเหลือ"]
+    CUT --> CUT1["date.js<br/>จัดรูปแบบวันที่และเวลา"]
+
+    %% ================= database =================
+    ROOT --> DB["📁 database<br/>โครงสร้างฐานข้อมูล"]
+    DB --> DB1["schema.sql<br/>สร้างตารางทั้งหมด"]
+    DB --> DB2["seed.sql<br/>ข้อมูลตั้งต้น"]
+    DB --> MIG["📁 migrations<br/>อัปเดตฐานข้อมูลตามลำดับ"]
+    MIG --> M2["002_booking_slot_index.sql<br/>index ช่วงเวลาการจอง"]
+    MIG --> M3["003_google_auth.sql<br/>รองรับล็อกอิน Google"]
+    MIG --> M4["004_loyalty_points.sql<br/>ระบบแต้มสะสม"]
+    MIG --> M5["005_profile_notifications.sql<br/>โปรไฟล์และการแจ้งเตือน"]
+    MIG --> M6["006_booking_in_service_status.sql<br/>สถานะกำลังให้บริการ"]
+    MIG --> M7["007_payment_summary.sql<br/>สรุปข้อมูลการชำระเงิน"]
+    MIG --> M8["008_slip_verification_history.sql<br/>ประวัติการตรวจสลิป"]
+    MIG --> M9["009_payment_timestamp.sql<br/>เวลาที่ชำระเงิน"]
+    MIG --> M10["010_cash_payment_method.sql<br/>เพิ่มการชำระด้วยเงินสด"]
+    MIG --> M11["011_contact_attachment_original_name.sql<br/>เก็บชื่อไฟล์แนบต้นฉบับ"]
+
+    %% ================= deploy =================
+    ROOT --> DP["📁 deploy<br/>ไฟล์สำหรับเซิร์ฟเวอร์จริง"]
+    DP --> DP1["nginx-carwash.conf.example<br/>ตัวอย่าง Nginx reverse proxy"]
+
+    %% ================= server =================
+    ROOT --> SV["📁 server<br/>Backend: Node.js + Express"]
+    SV --> SV1[".dockerignore<br/>ไฟล์ที่ไม่ใส่ใน Docker image"]
+    SV --> SV2[".env.example<br/>ตัวอย่างตัวแปร เช่น DB, secret"]
+    SV --> SV3["Dockerfile<br/>build image ฝั่ง API"]
+    SV --> SV4["package.json<br/>รายการ dependencies และ scripts"]
+    SV --> SV5["package-lock.json<br/>ล็อกเวอร์ชัน dependencies"]
+
+    SV --> SSRC["📁 src<br/>ซอร์สโค้ด API"]
+    SSRC --> SS1["server.js<br/>จุดเริ่มต้น Express server"]
+    SSRC --> SS2["db.js<br/>เชื่อมต่อฐานข้อมูล"]
+
+    SSRC --> MW["📁 middleware<br/>ทำงานก่อนเข้า route"]
+    MW --> MW1["auth.js<br/>ตรวจ token และสิทธิ์ผู้ใช้"]
+    MW --> MW2["upload.js<br/>อัปโหลดไฟล์ทั่วไป"]
+    MW --> MW3["privateUpload.js<br/>อัปโหลดไฟล์ส่วนตัว เช่น สลิป"]
+
+    SSRC --> RT["📁 routes<br/>API endpoints"]
+    RT --> RT1["auth.js<br/>สมัคร / ล็อกอิน / Google"]
+    RT --> RT2["services.js<br/>ข้อมูลบริการ"]
+    RT --> RT3["bookings.js<br/>การจองและการชำระเงิน"]
+    RT --> RT4["profile.js<br/>ข้อมูลโปรไฟล์ผู้ใช้"]
+    RT --> RT5["notifications.js<br/>การแจ้งเตือน"]
+    RT --> RT6["contacts.js<br/>ข้อความติดต่อ"]
+    RT --> RT7["admin.js<br/>API สำหรับผู้ดูแลระบบ"]
+
+    SSRC --> SUT["📁 utils<br/>ฟังก์ชันช่วยเหลือ"]
+    SUT --> SUT1["filename.js<br/>ตั้งชื่อไฟล์อัปโหลดให้ปลอดภัย"]
+
+    SV --> UP["📁 uploads<br/>เก็บไฟล์ที่ผู้ใช้อัปโหลด"]
+    UP --> UP1[".gitkeep<br/>เก็บโฟลเดอร์ว่างไว้ใน Git"]
 ```
 
-## รันด้วย Docker
+####  Root
 
-Docker Compose จะเปิด MySQL, API, Frontend และ phpMyAdmin แยกจากโปรแกรมที่ติดตั้งในเครื่อง โดยใช้พอร์ต `10300`, `3200`, `6200` และ `14300` ตามลำดับ
+| ไฟล์ / โฟลเดอร์ | คำอธิบาย |
+|---|---|
+| `.gitignore` | ระบุไฟล์ที่ไม่นำขึ้น Git เช่น `node_modules`, `.env` |
+| `.keep` | ไฟล์เปล่าสำหรับเก็บโฟลเดอร์ไว้ใน Git |
+| `docker-compose.yml` | รัน client, server และฐานข้อมูลพร้อมกันตอนพัฒนา |
+| `docker-compose.production.yml` | ตั้งค่า Docker สำหรับขึ้นระบบจริง (production) |
+| `README.md` | เอกสารอธิบายโปรเจกต์ |
+| `.github/workflows/deploy.yml` | GitHub Actions สำหรับ deploy อัตโนมัติเมื่อ push โค้ด |
+| `deploy/nginx-carwash.conf.example` | ตัวอย่างค่าตั้ง Nginx reverse proxy บนเซิร์ฟเวอร์จริง |
 
-พอร์ตฝั่งเครื่องสามารถเปลี่ยนได้ ถ้าเครื่องอื่นใช้พอร์ตเดิมอยู่:
+####  client — Frontend (React + Vite + Tailwind)
 
-```powershell
-cd 'E:\IT PROJECT\Friday'
-Copy-Item '.env.docker.example' '.env'
-notepad '.env'
+| ไฟล์ / โฟลเดอร์ | คำอธิบาย |
+|---|---|
+| `client/.dockerignore` | ไฟล์ที่ไม่ใส่ใน Docker image |
+| `client/.env.example` | ตัวอย่างตัวแปรสภาพแวดล้อม เช่น URL ของ API |
+| `client/Dockerfile` | build image ฝั่งหน้าเว็บ |
+| `client/nginx.conf` | ตั้งค่า Nginx สำหรับเสิร์ฟหน้าเว็บใน container |
+| `client/index.html` | หน้า HTML หลักของแอป |
+| `client/package.json` | รายการ dependencies และ scripts |
+| `client/package-lock.json` | ล็อกเวอร์ชัน dependencies |
+| `client/vite.config.js` | ตั้งค่า Vite (build tool) |
+| `client/tailwind.config.js` | ตั้งค่า Tailwind CSS |
+| `client/postcss.config.js` | ตั้งค่า PostCSS |
+| `client/vercel.json` | ตั้งค่าการ deploy บน Vercel |
+| `client/public/images/car-wash-1~4.png` | รูปภาพประกอบหน้าเว็บ |
+| `client/public/images/cash-payment.png` | ไอคอนชำระเงินสด |
+| `client/public/images/slip2go-logo.png` | โลโก้ระบบตรวจสลิป Slip2Go |
+
+####  client/src — ซอร์สโค้ดหน้าเว็บ
+
+| ไฟล์ / โฟลเดอร์ | คำอธิบาย |
+|---|---|
+| `client/src/main.jsx` | จุดเริ่มต้นของแอป React |
+| `client/src/App.jsx` | กำหนดเส้นทาง (routes) ของแต่ละหน้า |
+| `client/src/api.js` | รวมฟังก์ชันเรียก Backend API |
+| `client/src/auth.jsx` | จัดการสถานะการล็อกอินของผู้ใช้ |
+| `client/src/index.css` | สไตล์หลักและ Tailwind |
+| `client/src/utils/date.js` | ฟังก์ชันจัดรูปแบบวันที่และเวลา |
+| `client/src/components/GoogleSignInButton.jsx` | ปุ่มเข้าสู่ระบบด้วย Google |
+| `client/src/components/Icons.jsx` | รวมไอคอน SVG ที่ใช้ในเว็บ |
+| `client/src/components/Layout.jsx` | โครงหน้าเว็บ (header / footer / เมนู) |
+| `client/src/components/RouteGuards.jsx` | ป้องกันหน้าที่ต้องล็อกอินหรือเฉพาะ admin |
+
+####  client/src/pages — หน้าต่าง ๆ ของเว็บ
+
+| ไฟล์ | คำอธิบาย |
+|---|---|
+| `HomePage.jsx` | หน้าแรกของเว็บไซต์ |
+| `ServicesPage.jsx` | แสดงรายการบริการและราคา |
+| `BookingPage.jsx` | เลือกบริการ วัน และเวลาเพื่อจองคิว |
+| `PaymentPage.jsx` | ชำระเงิน แนบสลิป หรือเลือกเงินสด |
+| `StatusPage.jsx` | แสดงสถานะการจอง |
+| `TrackingPage.jsx` | ติดตามคิวล้างรถ |
+| `NotificationsPage.jsx` | รายการแจ้งเตือนของผู้ใช้ |
+| `ProfilePage.jsx` | ข้อมูลโปรไฟล์และแต้มสะสม |
+| `ContactPage.jsx` | ส่งข้อความติดต่อร้านพร้อมแนบไฟล์ |
+| `AuthPage.jsx` | สมัครสมาชิก / เข้าสู่ระบบ |
+| `AdminPage.jsx` | แผงควบคุมสำหรับผู้ดูแลระบบ |
+
+####  database — ฐานข้อมูล
+
+| ไฟล์ | คำอธิบาย |
+|---|---|
+| `database/schema.sql` | สร้างตารางทั้งหมดของระบบ |
+| `database/seed.sql` | ใส่ข้อมูลตั้งต้น เช่น รายการบริการ |
+| `migrations/002_booking_slot_index.sql` | เพิ่ม index ช่วงเวลาการจอง |
+| `migrations/003_google_auth.sql` | รองรับการล็อกอินด้วย Google |
+| `migrations/004_loyalty_points.sql` | เพิ่มระบบแต้มสะสม |
+| `migrations/005_profile_notifications.sql` | เพิ่มข้อมูลโปรไฟล์และการแจ้งเตือน |
+| `migrations/006_booking_in_service_status.sql` | เพิ่มสถานะ "กำลังให้บริการ" |
+| `migrations/007_payment_summary.sql` | เพิ่มข้อมูลสรุปการชำระเงิน |
+| `migrations/008_slip_verification_history.sql` | เก็บประวัติการตรวจสลิป |
+| `migrations/009_payment_timestamp.sql` | เก็บเวลาที่ชำระเงิน |
+| `migrations/010_cash_payment_method.sql` | เพิ่มวิธีชำระด้วยเงินสด |
+| `migrations/011_contact_attachment_original_name.sql` | เก็บชื่อไฟล์แนบต้นฉบับของข้อความติดต่อ |
+
+####  server — Backend (Node.js + Express)
+
+| ไฟล์ / โฟลเดอร์ | คำอธิบาย |
+|---|---|
+| `server/.dockerignore` | ไฟล์ที่ไม่ใส่ใน Docker image |
+| `server/.env.example` | ตัวอย่างตัวแปร เช่น ค่าเชื่อมต่อฐานข้อมูล, secret key |
+| `server/Dockerfile` | build image ฝั่ง API |
+| `server/package.json` | รายการ dependencies และ scripts |
+| `server/package-lock.json` | ล็อกเวอร์ชัน dependencies |
+| `server/uploads/` | โฟลเดอร์เก็บไฟล์ที่ผู้ใช้อัปโหลด (`.gitkeep` ใช้เก็บโฟลเดอร์ว่างไว้ใน Git) |
+| `server/src/server.js` | จุดเริ่มต้นของ Express API server |
+| `server/src/db.js` | เชื่อมต่อฐานข้อมูล |
+| `server/src/middleware/auth.js` | ตรวจ token และสิทธิ์ผู้ใช้ก่อนเข้าถึง API |
+| `server/src/middleware/upload.js` | จัดการอัปโหลดไฟล์ทั่วไป |
+| `server/src/middleware/privateUpload.js` | จัดการไฟล์ส่วนตัว เช่น สลิปโอนเงิน |
+| `server/src/utils/filename.js` | ตั้งชื่อไฟล์อัปโหลดให้ปลอดภัยและไม่ซ้ำกัน |
+
+####  server/src/routes — API Endpoints
+
+| ไฟล์ | คำอธิบาย |
+|---|---|
+| `auth.js` | สมัครสมาชิก / เข้าสู่ระบบ / ล็อกอินด้วย Google |
+| `services.js` | ข้อมูลบริการล้างรถ |
+| `bookings.js` | สร้างการจอง ดูสถานะ และชำระเงิน |
+| `profile.js` | ดูและแก้ไขข้อมูลโปรไฟล์ |
+| `notifications.js` | การแจ้งเตือนของผู้ใช้ |
+| `contacts.js` | รับข้อความติดต่อจากลูกค้า |
+| `admin.js` | API สำหรับผู้ดูแลระบบ |
+
+---
+
+### 2.3 โครงสร้างฐานข้อมูล (ER Diagram)
+
+```mermaid
+erDiagram
+    USERS ||--o{ VEHICLES : "เป็นเจ้าของ"
+    USERS ||--o{ BOOKINGS : "จอง"
+    USERS ||--o{ NOTIFICATIONS : "ได้รับ"
+    USERS ||--o{ CONTACT_MESSAGES : "ส่ง"
+    USERS ||--o{ POINT_TRANSACTIONS : "สะสม"
+    USERS ||--o{ PAYMENTS : "แอดมินยืนยัน"
+    USERS ||--o{ BOOKING_STATUS_LOGS : "ผู้เปลี่ยนสถานะ"
+    VEHICLES ||--o{ BOOKINGS : "ใช้ในการจอง"
+    SERVICES ||--o{ BOOKINGS : "เป็นบริการหลัก"
+    SERVICES ||--o{ BOOKING_ADDONS : "เป็นบริการเสริม"
+    BOOKINGS ||--o{ BOOKING_ADDONS : "มี"
+    BOOKINGS ||--o{ PAYMENTS : "ชำระด้วย"
+    BOOKINGS ||--o{ NOTIFICATIONS : "เกี่ยวข้อง"
+    BOOKINGS ||--o{ POINT_TRANSACTIONS : "ให้แต้ม"
+    BOOKINGS ||--o{ BOOKING_STATUS_LOGS : "บันทึกการเปลี่ยนสถานะ"
+    PAYMENTS ||--o{ SLIP_CHECKS : "ถูกตรวจสลิป"
+
+    USERS {
+        bigint id PK
+        varchar full_name
+        varchar email UK
+        varchar phone
+        varchar password_hash "null ได้ถ้าสมัครด้วย Google"
+        varchar google_id UK "null ได้"
+        varchar role "customer หรือ admin"
+        int points_balance "แต้มสะสมคงเหลือ"
+        datetime created_at "วันที่เป็นสมาชิก"
+        datetime updated_at
+    }
+
+    VEHICLES {
+        bigint id PK
+        bigint user_id FK
+        varchar car_model "รุ่นรถ"
+        varchar license_plate "ทะเบียน"
+        datetime created_at
+    }
+
+    SERVICES {
+        bigint id PK
+        varchar type "main หรือ addon"
+        varchar name
+        text description
+        decimal price "ก่อน VAT"
+        int duration_minutes "ใช้กับบริการหลัก"
+        boolean is_active "เปิดให้ลูกค้าเลือกจอง"
+        datetime created_at
+        datetime updated_at
+    }
+
+    BOOKINGS {
+        bigint id PK
+        varchar booking_code UK "เช่น CWMVVKVGN0631"
+        bigint user_id FK
+        bigint vehicle_id FK "null ได้"
+        bigint main_service_id FK
+        varchar customer_name "snapshot ตอนจอง"
+        varchar customer_phone
+        varchar car_model
+        varchar license_plate
+        date service_date "จันทร์ถึงเสาร์"
+        varchar time_slot "เช่น 09:00-10:00"
+        decimal main_price "ราคา ณ วันจอง"
+        decimal addons_total
+        decimal subtotal "ก่อน VAT"
+        decimal vat_amount "7 เปอร์เซ็นต์"
+        decimal total_amount "ยอดชำระสุทธิ"
+        varchar status "ดูหัวข้อ Enum"
+        varchar cancelled_by "customer หรือ admin"
+        datetime cancelled_at
+        int points_earned
+        datetime created_at
+        datetime updated_at
+    }
+
+    BOOKING_ADDONS {
+        bigint id PK
+        bigint booking_id FK
+        bigint service_id FK
+        varchar name "snapshot"
+        decimal price "ราคา ณ วันจอง"
+    }
+
+    PAYMENTS {
+        bigint id PK
+        bigint booking_id FK
+        varchar method "promptpay หรือ cash"
+        varchar status "ดูหัวข้อ Enum"
+        decimal amount
+        varchar slip_url "ที่เก็บรูปสลิป"
+        datetime cash_reported_at "ลูกค้ากดแจ้งชำระเงินสด"
+        bigint confirmed_by FK "แอดมินที่ยืนยันรับเงินสด"
+        datetime verified_at "ใช้นับรายรับรายวัน"
+        datetime created_at
+    }
+
+    SLIP_CHECKS {
+        bigint id PK
+        bigint payment_id FK
+        boolean is_passed
+        varchar reason "เช่น Slip is Duplicated"
+        decimal amount
+        varchar reference_id
+        varchar transaction_ref UK "กันสลิปซ้ำ"
+        json raw_response
+        datetime checked_at
+    }
+
+    POINT_TRANSACTIONS {
+        bigint id PK
+        bigint user_id FK
+        bigint booking_id FK
+        int points "1 แต้มต่อ 25 บาท"
+        datetime created_at
+    }
+
+    NOTIFICATIONS {
+        bigint id PK
+        bigint user_id FK "ผู้รับ ลูกค้าหรือแอดมิน"
+        bigint booking_id FK "null ได้"
+        varchar title
+        text message
+        boolean is_read
+        datetime created_at
+    }
+
+    CONTACT_MESSAGES {
+        bigint id PK
+        bigint user_id FK "null ได้"
+        varchar sender_name
+        varchar contact "เบอร์โทรหรืออีเมล"
+        varchar subject "หัวข้อ"
+        text message
+        varchar attachment_url "รูปหรือ PDF ไม่เกิน 5 MB"
+        varchar status "unread, read, archived"
+        datetime created_at
+    }
+
+    BOOKING_STATUS_LOGS {
+        bigint id PK
+        bigint booking_id FK
+        varchar from_status
+        varchar to_status
+        bigint changed_by FK
+        datetime changed_at
+    }
 ```
 
-แก้ค่า `WEB_PORT`, `API_PORT`, `MYSQL_PORT` หรือ `PHPMYADMIN_PORT` ในไฟล์นั้นได้ โดยพอร์ตด้านซ้ายคือพอร์ตที่เปิดบนเครื่อง ส่วนพอร์ตด้านขวาใน `docker-compose.yml` เป็นพอร์ตภายใน container ไม่ต้องแก้
+---
 
-เปิด phpMyAdmin ที่ `http://localhost:14300` แล้วกรอกค่าดังนี้:
+### คำอธิบายแต่ละ Table
 
-```text
-Server: db
-Username: carwash
-Password: carwash_dev_password
-Database: carwash_queue
+| # | Table | หน้าที่ |
+|---|---|---|
+| 1 | `users` | บัญชีผู้ใช้ทั้งลูกค้าและแอดมิน |
+| 2 | `vehicles` | รถของลูกค้า |
+| 3 | `services` | บริการหลักและบริการเสริมพร้อมราคา |
+| 4 | `bookings` | การจองคิว (ตารางหลัก) |
+| 5 | `booking_addons` | บริการเสริมในแต่ละการจอง |
+| 6 | `payments` | การชำระเงิน |
+| 7 | `slip_checks` | ประวัติผลตรวจสลิป |
+| 8 | `point_transactions` | ประวัติแต้มสะสม |
+| 9 | `notifications` | การแจ้งเตือน |
+| 10 | `contact_messages` | ข้อความจากหน้า "ติดต่อเรา" |
+| 11 | `booking_status_logs` | ประวัติการเปลี่ยนสถานะการจอง (เสริม) |
+
+#### `users` — ผู้ใช้งาน
+
+เก็บบัญชีทั้งลูกค้าและแอดมินไว้ใน table เดียว แยกด้วย `role`
+
+| Column | คำอธิบาย |
+|---|---|
+| `id` | รหัสผู้ใช้ (PK) |
+| `full_name`, `email`, `phone` | ข้อมูลส่วนตัว แสดงในหน้าโปรไฟล์และหน้าข้อมูลลูกค้าของแอดมิน |
+| `password_hash` | รหัสผ่านที่เข้ารหัสแล้ว (ว่างได้ถ้าเข้าสู่ระบบด้วย Google อย่างเดียว) |
+| `google_id` | รหัสบัญชี Google สำหรับ "ดำเนินการต่อโดยใช้ Google" |
+| `role` | `customer` หรือ `admin` ใช้กำหนดสิทธิ์เข้า `/admin` |
+| `points_balance` | แต้มสะสมคงเหลือ (เก็บซ้ำเพื่อให้เรียกดูได้เร็ว ตรวจสอบย้อนหลังได้จาก `point_transactions`) |
+| `created_at` | วันที่เป็นสมาชิก |
+
+#### `vehicles` — ประวัติรถ
+
+รถที่ลูกค้าเคยจองหรือบันทึกไว้ (ปุ่ม **+ เพิ่มรถ** ในหน้าโปรไฟล์) ลูกค้า 1 คนมีได้หลายคัน
+
+| Column | คำอธิบาย |
+|---|---|
+| `user_id` | เจ้าของรถ (FK → `users`) |
+| `car_model` | รุ่นรถ เช่น adv150, wave125 |
+| `license_plate` | ทะเบียนรถ ใช้ค้นหาในหน้าแอดมิน |
+
+#### `services` — บริการและราคา
+
+เก็บทั้งบริการหลัก (Standard / Premium / Full Detailing) และบริการเสริม (เคลือบแก้ว, ขัดโคมไฟ ฯลฯ) แยกด้วย `type`
+
+| Column | คำอธิบาย |
+|---|---|
+| `type` | `main` = บริการหลัก, `addon` = บริการเสริม |
+| `price` | ราคาก่อน VAT 7% |
+| `duration_minutes` | ระยะเวลาให้บริการ (ใช้กับบริการหลัก) |
+| `is_active` | เปิดให้ลูกค้าเลือกจองหรือไม่ ปุ่ม "ปิดบริการ" จะตั้งค่าเป็น `false` แทนการลบ เพื่อให้ประวัติเดิมยังอ้างอิงได้ |
+
+#### `bookings` — การจอง (ตารางหลัก)
+
+1 แถวต่อ 1 การจอง
+
+| Column | คำอธิบาย |
+|---|---|
+| `booking_code` | รหัสจองที่แสดงให้ลูกค้า ใช้ค้นหาและติดตามสถานะ |
+| `user_id`, `vehicle_id`, `main_service_id` | อ้างอิงลูกค้า รถ และบริการหลัก |
+| `customer_name`, `customer_phone`, `car_model`, `license_plate` | สำเนาข้อมูลตอนจอง (snapshot) เพื่อไม่ให้เปลี่ยนตามโปรไฟล์ภายหลัง |
+| `service_date`, `time_slot` | วันและช่วงเวลา (จันทร์–เสาร์ 09:00–16:00 เว้นพักเที่ยง) |
+| `main_price`, `addons_total`, `subtotal`, `vat_amount`, `total_amount` | ราคา ณ วันจอง การปรับราคาภายหลังจึงไม่กระทบการจองเดิม |
+| `status` | สถานะการจอง (ดู [ค่า Enum](#25-ค่า-enum)) |
+| `cancelled_by`, `cancelled_at` | ผู้ยกเลิกและเวลาที่ยกเลิก |
+| `points_earned` | แต้มที่ได้รับเมื่อสถานะเป็น "พร้อมรับรถแล้ว" |
+
+> **กฎสำคัญ:** 1 ช่วงเวลารับได้ 1 คัน ให้ตั้ง unique index บน `(service_date, time_slot)` เฉพาะแถวที่ `status <> 'cancelled'` (partial unique index) เพื่อกันการจองซ้อนกัน
+
+#### `booking_addons` — บริการเสริมในแต่ละการจอง
+
+ตารางเชื่อมแบบ many-to-many ระหว่าง `bookings` กับ `services` (เฉพาะ `type = addon`) และเก็บ `name` กับ `price` ณ วันจองไว้ด้วย
+
+#### `payments` — การชำระเงิน
+
+แยกออกจาก `bookings` เพื่อรองรับกรณีสลิปไม่ผ่านแล้วลูกค้าส่งใหม่ หรือเปลี่ยนช่องทางชำระเงิน
+
+| Column | คำอธิบาย |
+|---|---|
+| `method` | `promptpay` (QR + สลิป) หรือ `cash` (จ่ายที่ร้าน) |
+| `status` | สถานะการชำระเงิน (ดู [ค่า Enum](#25-ค่า-enum)) |
+| `slip_url` | ตำแหน่งไฟล์สลิป (JPG, PNG, WEBP) |
+| `cash_reported_at` | เวลาที่ลูกค้ากด "แจ้งชำระเงินสด" |
+| `confirmed_by` | แอดมินที่กดยืนยันรับเงินสด |
+| `verified_at` | เวลาที่ยืนยันการชำระเงินจริง — **หน้ารายรับใช้ฟิลด์นี้นับยอดรายวัน** ไม่ใช่วันที่นัดล้างรถ |
+
+#### `slip_checks` — ประวัติผลตรวจสลิป
+
+เก็บผลตรวจจากบริการตรวจสลิปทุกครั้ง (ปุ่ม "ประวัติผลตรวจ" ของแอดมิน)
+
+| Column | คำอธิบาย |
+|---|---|
+| `is_passed` | ผ่านหรือไม่ผ่าน |
+| `reason` | เหตุผล เช่น Slip is Duplicated, ยอดไม่ตรง |
+| `reference_id`, `transaction_ref` | รหัสอ้างอิงจากผู้ให้บริการและธนาคาร ใช้ตรวจสลิปซ้ำ (`transaction_ref` ควรเป็น unique เมื่อตรวจผ่านแล้ว) |
+| `raw_response` | ผลตอบกลับดิบจาก API เก็บไว้ตรวจสอบย้อนหลัง |
+
+#### `point_transactions` — ประวัติแต้มสะสม
+
+บันทึกแต้มทุกครั้งที่ได้รับ (1 แต้มต่อทุก 25 บาท เมื่อบริการเสร็จสิ้น) ใช้แสดงในหน้า Customer Record ของแอดมิน และใช้ตรวจสอบความถูกต้องของ `users.points_balance`
+
+#### `notifications` — การแจ้งเตือน
+
+ใช้กับไอคอนกระดิ่งของทั้งลูกค้าและแอดมิน
+
+| Column | คำอธิบาย |
+|---|---|
+| `user_id` | ผู้รับการแจ้งเตือน |
+| `booking_id` | การจองที่เกี่ยวข้อง (ว่างได้) |
+| `is_read` | ใช้แสดงตัวเลขสีแดงของรายการที่ยังไม่อ่าน |
+
+ตัวอย่างเหตุการณ์ที่แจ้งเตือน:
+
+- **ลูกค้า:** ได้รับคำขอจอง, รับรถเข้าคิวแล้ว, กำลังให้บริการ, พร้อมรับรถแล้ว
+- **แอดมิน:** ยืนยันชำระเงินแล้ว, สลิปไม่ผ่าน
+
+#### `contact_messages` — ข้อความจากหน้า "ติดต่อเรา"
+
+| Column | คำอธิบาย |
+|---|---|
+| `subject` | สอบถามบริการ / สอบถามการจอง / แจ้งปัญหา / ข้อเสนอแนะ |
+| `attachment_url` | ไฟล์แนบ (รูปภาพหรือ PDF ไม่เกิน 5 MB) |
+| `status` | `unread` / `read` / `archived` (ยังไม่อ่าน / อ่านแล้ว / เก็บถาวร) |
+
+#### `booking_status_logs` — ประวัติการเปลี่ยนสถานะ (เสริม)
+
+บันทึกว่าใครเปลี่ยนสถานะการจองจากอะไรเป็นอะไร และเมื่อไหร่ เนื่องจากการกด "พร้อมรับรถ" ย้อนกลับไม่ได้ จึงควรมี log ไว้ตรวจสอบ (ถ้าไม่ต้องการ ตัด table นี้ออกได้)
+
+---
+
+### ค่า Enum
+
+**`bookings.status`**
+
+| ค่า | ความหมาย |
+|---|---|
+| `pending` | รอยืนยันการจอง |
+| `queued` | รับรถเข้าคิวแล้ว |
+| `in_service` | กำลังให้บริการ |
+| `ready` | พร้อมรับรถแล้ว (จบงาน และให้แต้มสะสม) |
+| `cancelled` | ยกเลิกการจอง |
+
+**`payments.status`**
+
+| ค่า | ความหมาย |
+|---|---|
+| `unpaid` | ยังไม่ชำระ |
+| `pending` | รอตรวจสอบ (แนบสลิปแล้ว หรือแจ้งชำระเงินสดแล้ว) |
+| `verified` | ตรวจสอบแล้ว |
+| `failed` | ไม่ผ่านการตรวจสอบ |
+
+**ค่าอื่น ๆ**
+
+| Field | ค่าที่เป็นไปได้ |
+|---|---|
+| `payments.method` | `promptpay`, `cash` |
+| `users.role` | `customer`, `admin` |
+| `services.type` | `main`, `addon` |
+| `contact_messages.status` | `unread`, `read`, `archived` |
+
+---
+
+### ข้อสังเกตในการออกแบบ
+
+| หัวข้อ | แนวทาง |
+|---|---|
+| **Snapshot ราคาและข้อมูลลูกค้า** | เก็บไว้ใน `bookings` และ `booking_addons` เพราะราคาใหม่มีผลกับการจองใหม่เท่านั้น |
+| **ไม่ลบบริการจริง** | ใช้ `services.is_active = false` เพื่อรักษาความสัมพันธ์กับประวัติการจอง |
+| **การคำนวณรายรับ** | ใช้ `payments` ที่ `status = 'verified'` จัดกลุ่มตาม `verified_at` และแยกตามบริการด้วยการ join `bookings → services` (ยอดก่อน VAT = `subtotal`, VAT = `vat_amount`) |
+| **ป้องกันจองซ้ำ** | unique index บน `(service_date, time_slot)` ที่สถานะไม่ใช่ `cancelled` และตรวจซ้ำใน transaction ตอนสร้างหรือเลื่อนคิว |
+| **ป้องกันสลิปซ้ำ** | ตรวจ `transaction_ref` ใน `slip_checks` ที่ `is_passed = true` |
+| **Index ที่ควรมี** | `bookings(user_id)`, `bookings(status)`, `bookings(booking_code)`, `bookings(license_plate)`, `payments(booking_id)`, `notifications(user_id, is_read)` |
+
+---
+
+### 3) เทคโนโลยีที่ใช้ในการพัฒนา (Tech Stack)
+
+### Frontend (`client`)
+
+| เทคโนโลยี | เวอร์ชัน | หน้าที่ |
+|---|---|---|
+| React | 18.3.1 | ไลบรารีสร้างหน้าเว็บแบบ Component |
+| React DOM | 18.3.1 | แสดงผล React บนเบราว์เซอร์ |
+| React Router DOM | 6.30.6 | จัดการเส้นทางหน้าเว็บ (`/booking`, `/payment/:code`, `/admin` ฯลฯ) |
+| Vite | 6.4.3 | Dev Server และ Build Tool |
+| @vitejs/plugin-react | 4.7.0 | Plugin ให้ Vite รองรับ React (JSX) |
+| Tailwind CSS | 3.4.19 | จัดสไตล์หน้าเว็บแบบ Utility-first |
+| PostCSS | 8.5.26 | ประมวลผล CSS ร่วมกับ Tailwind |
+| Autoprefixer | 10.5.4 | เติม Vendor Prefix ให้ CSS อัตโนมัติ |
+| Google Identity Services | – (โหลดจาก CDN) | ปุ่มเข้าสู่ระบบด้วย Google |
+| Google Fonts (Prompt) | – | ฟอนต์ภาษาไทยของเว็บไซต์ |
+
+###  Backend (`server`)
+
+| เทคโนโลยี | เวอร์ชัน | หน้าที่ |
+|---|---|---|
+| Node.js | 20 (`node:20-alpine`) | Runtime สำหรับรัน JavaScript ฝั่งเซิร์ฟเวอร์ |
+| Express | 4.22.2 | Web Framework สร้าง REST API (`/api/*`) |
+| mysql2 | 3.24.2 | เชื่อมต่อฐานข้อมูล MySQL (Connection Pool + Transaction) |
+| jsonwebtoken | 9.0.3 | สร้างและตรวจสอบ JWT สำหรับยืนยันตัวตน |
+| bcryptjs | 2.4.3 | เข้ารหัสรหัสผ่านก่อนบันทึกลงฐานข้อมูล |
+| google-auth-library | 10.9.1 | ตรวจสอบ ID Token ของ Google Sign-In |
+| multer | 1.4.5-lts.2 | รับไฟล์อัปโหลด (สลิปโอนเงิน, ไฟล์แนบติดต่อร้าน) |
+| cookie-parser | 1.4.7 | อ่าน Cookie ที่เก็บ JWT |
+| cors | 2.8.6 | อนุญาตให้ Frontend เรียก API ข้ามโดเมน |
+| dotenv | 16.6.1 | โหลดค่าตั้งค่าจากไฟล์ `.env` |
+
+### Database
+
+| เทคโนโลยี | เวอร์ชัน | หน้าที่ |
+|---|---|---|
+| MySQL | 8.4 (`mysql:8.4`) | ฐานข้อมูลหลัก (`users`, `services`, `addons`, `bookings`, `booking_addons`, `slip_verifications`, `customer_cars`, `notifications`, `contacts`) |
+| phpMyAdmin | 5.2 (`phpmyadmin:5.2-apache`) | จัดการฐานข้อมูลผ่านหน้าเว็บ (ใช้ตอนพัฒนา) |
+
+### บริการภายนอก (External Services)
+
+| บริการ | หน้าที่ |
+|---|---|
+| Google Sign-In (OAuth 2.0) | เข้าสู่ระบบด้วยบัญชี Google |
+| Slip2Go API | ตรวจสอบสลิปโอนเงินพร้อมเพย์อัตโนมัติ (บัญชีผู้รับ, ยอดเงิน, สลิปซ้ำ) |
+| promptpay.io | สร้างรูป QR Code พร้อมเพย์ตามยอดที่ต้องชำระ |
+
+### การ Deploy
+
+| รายการ | เทคโนโลยี / เวอร์ชัน | รายละเอียด |
+|---|---|---|
+| VPS | Hostinger VPS | เซิร์ฟเวอร์ที่รันระบบ เข้าถึงผ่าน SSH |
+| OS | Ubuntu 26.04 LTS | ระบบปฏิบัติการของ VPS |
+| Domain | `carwash.carcareku.tech` | Subdomain ของระบบ |
+| Web Server (บน VPS) | Nginx | Reverse Proxy รับคำขอจากโดเมน ส่งต่อไปที่ Container `127.0.0.1:16200` |
+| Web Server (ใน Container) | Nginx (`nginx:alpine`) | เสิร์ฟไฟล์ React ที่ Build แล้ว และส่งต่อ `/api/` ไปที่ Backend |
+| Docker | Docker Engine + Docker Compose v2 | รันระบบ 3 Container: `client`, `api`, `db` |
+| Container Registry | GitHub Container Registry (ghcr.io) | เก็บ Docker Image ของ `api` และ `client` |
+| CI/CD | GitHub Actions | เมื่อ push ขึ้น `main` จะ Build Image → Push ขึ้น GHCR → SSH เข้า VPS → รัน Migration → `docker compose pull && up -d` → เช็ก `/api/health` |
+| Actions ที่ใช้ | `actions/checkout@v4`, `docker/setup-buildx-action@v3`, `docker/login-action@v3`, `docker/build-push-action@v6` | ขั้นตอนใน `.github/workflows/deploy.yml` |
+| Vercel (ทางเลือก) | `client/vercel.json` | ตั้งค่าไว้สำหรับ Deploy เฉพาะ Frontend |
+
+### เครื่องมือพัฒนา (Development Tools)
+
+| เครื่องมือ | เวอร์ชัน | หน้าที่ |
+|---|---|---|
+| Git + GitHub | – | จัดการเวอร์ชันโค้ดและทำงานร่วมกันในทีม |
+| npm | มากับ Node.js 20 | ติดตั้งและจัดการแพ็กเกจ |
+| Docker Compose (Dev) | `docker-compose.yml` | รัน `client` + `api` + `db` + `phpMyAdmin` บนเครื่องตัวเองด้วยคำสั่งเดียว |
+| Vite Dev Server | 6.4.3 | รัน Frontend ตอนพัฒนา (`npm run dev`) |
+| Node.js `--watch` | 20 | รีสตาร์ต Backend อัตโนมัติเมื่อแก้โค้ด (`npm run dev`) |
+| phpMyAdmin | 5.2 | ดูและแก้ข้อมูลในฐานข้อมูลตอนพัฒนา |
+| Code Editor | Visual Studio Code | เขียนโค้ด |
+
+---
+
+
+### 4) กระบวนการทำงานของระบบ (System Workflow)
+
+### 4.1 ภาพรวมการทำงานของทั้งระบบ (Flowchart)
+
+```mermaid
+%%{init: {"flowchart": {"curve": "stepAfter"}}}%%
+flowchart TD
+    Start([เริ่มต้น]) --> Login{"เข้าสู่ระบบแล้ว?"}
+    Login -->|ไม่ใช่| Auth["สมัครสมาชิก / เข้าสู่ระบบ<br>อีเมล หรือ Google"]
+    Auth --> Book
+    Login -->|ใช่| Book["เมนูจองคิว"]
+
+    Book --> PickDate["เลือกวันที่เข้ารับบริการ"]
+    PickDate --> Sunday{"เป็นวันอาทิตย์?"}
+    Sunday -->|ใช่| Closed["แจ้งว่าร้านปิด<br>ให้เลือกวันจันทร์–เสาร์"]
+    Closed --> PickDate
+    Sunday -->|ไม่ใช่| PickSlot["เลือกช่วงเวลา<br>ระบบแสดงคิวว่าง"]
+    PickSlot --> Free{"ช่วงเวลายังว่าง?"}
+    Free -->|ไม่ว่าง| PickSlot
+    Free -->|ว่าง| Service["เลือกบริการหลัก 1 แบบ<br>และบริการเสริม"]
+    Service --> Info["กรอกข้อมูลลูกค้าและรถ"]
+    Info --> Confirm["ยืนยันการจอง<br>สถานะ: รอยืนยันการจอง"]
+
+    Confirm --> Pay["หน้าชำระเงิน<br>ยอดบริการ + VAT 7%"]
+    Pay --> Method{"ช่องทางชำระเงิน"}
+
+    Method -->|พร้อมเพย์ / QR| Scan["สแกน QR และโอนเงิน"]
+    Scan --> Upload["แนบสลิป"]
+    Upload --> Check{"ระบบตรวจสลิป<br>ผ่าน?"}
+    Check -->|ไม่ผ่าน| Fail["สถานะ: ไม่ผ่านการตรวจสอบ"]
+    Fail --> Upload
+    Check -->|ผ่าน| Paid["ชำระเงิน: ตรวจสอบแล้ว"]
+
+    Method -->|เงินสด| Cash["จ่ายเงินสดที่ร้าน"]
+    Cash --> Notify["กดแจ้งชำระเงินสด<br>สถานะ: รอตรวจสอบ"]
+    Notify --> AdminCash["แอดมินกดยืนยันรับเงินสด"]
+    AdminCash --> Paid
+
+    Paid --> Queue["แอดมินกด รับรถเข้าคิว<br>สถานะ: รับรถเข้าคิวแล้ว"]
+    Queue --> Serve["แอดมินกด เริ่มให้บริการ<br>สถานะ: กำลังให้บริการ"]
+    Serve --> Ready["แอดมินกด พร้อมรับรถ<br>สถานะ: พร้อมรับรถแล้ว"]
+    Ready --> Points["ลูกค้าได้รับแจ้งเตือน<br>และแต้มสะสม 1 แต้ม / 25 บาท"]
+    Points --> End([สิ้นสุด])
+
+    Confirm -.-> Cancel["เลื่อนวันเวลา / ยกเลิกการจอง<br>ทำได้ก่อนถึงพร้อมรับรถแล้ว"]
+```
+### 4.2 กระบวนการของฟังก์ชันหลัก
+### 1. ฟังก์ชันจองคิว
+```mermaid
+%%{init: {"flowchart": {"curve": "stepAfter"}}}%%
+flowchart TD
+    S([เริ่มต้น]) --> A1[/"ลูกค้าเปิดเมนู จองคิว"/]
+    A1 --> L{"เข้าสู่ระบบแล้ว?"}
+    L -->|ไม่ใช่| A0[/"สมัครสมาชิก / เข้าสู่ระบบ"/]
+    A0 --> L
+    L -->|ใช่| B1["ดึงบริการหลักและบริการเสริมที่เปิดจอง"]
+    B1 --> A2[/"เลือกวันที่เข้ารับบริการ"/]
+    A2 --> D1{"เป็นวันอาทิตย์?"}
+    D1 -->|ใช่| B2["แจ้งว่าร้านปิดทุกวันอาทิตย์"]
+    B2 --> A2
+    D1 -->|ไม่ใช่| B3["นับคิวว่างแต่ละช่วงเวลา<br>เช่น ว่าง 1/1 คิว"]
+    B3 --> A3[/"เลือกช่วงเวลา บริการหลัก<br>และบริการเสริม"/]
+    A3 --> B4["คำนวณยอดรวม<br>แสดงกล่องสรุปรายการจอง"]
+    B4 --> A4[/"กรอกข้อมูลลูกค้าและรถ<br>กด ยืนยันการจอง"/]
+    A4 --> D2{"ข้อมูลครบ และ<br>ช่วงเวลายังว่าง?"}
+    D2 -->|ไม่ใช่| B5["แจ้งข้อผิดพลาด<br>ให้แก้ไขหรือเลือกช่วงใหม่"]
+    B5 --> A3
+    D2 -->|ใช่| B6["บันทึกการจอง<br>สถานะ: รอยืนยันการจอง<br>การชำระเงิน: ยังไม่ชำระ"]
+    B6 --> B7["แจ้งเตือนแอดมินว่ามีการจองใหม่"]
+    B7 --> E([ไปหน้าชำระเงิน])
+
+    DBS[("ตารางบริการ")]
+    DBB[("ตารางการจอง")]
+    DBN[("ตารางการแจ้งเตือน")]
+    DBS -.->|อ่าน| B1
+    DBB -.->|อ่าน| B3
+    B6 -.->|บันทึก| DBB
+    B7 -.->|บันทึก| DBN
+
+    linkStyle default interpolate stepAfter
 ```
 
-```powershell
-cd 'E:\IT PROJECT\Friday'
-docker compose up --build
+### 2. ฟังก์ชันชำระเงิน
+
+```mermaid
+%%{init: {"flowchart": {"curve": "stepAfter"}}}%%
+flowchart TD
+    S([เริ่มต้น]) --> A1[/"ลูกค้าเลือกช่องทาง<br>พร้อมเพย์ / QR Code"/]
+    A1 --> B1["คำนวณยอดบริการ + VAT 7%<br>และสร้าง QR พร้อมเพย์"]
+    B1 --> A2[/"สแกน QR และโอนเงิน<br>ผ่านแอปธนาคาร"/]
+    A2 --> A3[/"แนบรูปสลิป<br>กด ตรวจสอบและยืนยันการชำระเงิน"/]
+    A3 --> D0{"ไฟล์เป็น<br>JPG / PNG / WEBP?"}
+    D0 -->|ไม่ใช่| B0["แจ้งให้เลือกไฟล์รูปที่รองรับ"]
+    B0 --> A3
+    D0 -->|ใช่| B2["อัปโหลดสลิป<br>การชำระเงิน: รอตรวจสอบ"]
+    B2 --> B3["ส่งสลิปไปตรวจสอบ"]
+    B3 --> D1{"QR ถูกต้อง ยอดตรง<br>บัญชีผู้รับถูก และไม่ใช่สลิปซ้ำ?"}
+    D1 -->|ผ่าน| B4["การชำระเงิน: ตรวจสอบแล้ว"]
+    B4 --> B5["แจ้งเตือนลูกค้าและแอดมิน"]
+    B5 --> E([ไปหน้าติดตามสถานะ])
+    D1 -->|ไม่ผ่าน| B6["การชำระเงิน: ไม่ผ่านการตรวจสอบ<br>บันทึกเหตุผล"]
+    B6 --> B7["แจ้งเตือนแอดมิน<br>และแจ้งลูกค้าให้แนบสลิปใหม่"]
+    B7 --> A3
+
+    DBB[("ตารางการจอง")]
+    DBP[("ข้อมูลการชำระเงิน<br>และประวัติผลตรวจสลิป")]
+    DBN[("ตารางการแจ้งเตือน")]
+    API[["บริการตรวจสลิปอัตโนมัติ"]]
+    DBB -.->|อ่านยอด| B1
+    B2 -.->|บันทึกสลิป| DBP
+    B3 -.->|ส่งรูปสลิป| API
+    API -.->|ผลตรวจ| D1
+    B4 -.->|บันทึก| DBP
+    B6 -.->|บันทึก| DBP
+    B5 -.->|บันทึก| DBN
+    B7 -.->|บันทึก| DBN
+
+    linkStyle default interpolate stepAfter
 ```
 
-เปิดเว็บที่ `http://localhost:6200` และหยุดระบบด้วย:
+### 3. ฟังก์ชันแอดมินอัปเดตสถานะงาน และลูกค้าติดตามสถานะคิว
 
-```powershell
-docker compose down
+### ฟังก์ชันแอดมินอัปเดตสถานะงาน
+```mermaid
+%%{init: {"flowchart": {"curve": "stepAfter"}}}%%
+flowchart TD
+    S([เริ่มต้น]) --> M1[/"แอดมินเปิดแท็บ รายการจอง"/]
+    M1 --> B1["ระบบแสดงรายการจองทั้งหมด<br>พร้อมสถานะการจองและการชำระเงิน"]
+    B1 --> M2[/"แอดมินค้นหาหรือกรอง<br>แล้วเลือกรายการจอง"/]
+    M2 --> DC{"ต้องการ<br>ยกเลิกการจอง?"}
+    DC -->|ใช่| BC["บันทึกสถานะ: ยกเลิกการจอง<br>และแจ้งเตือนลูกค้า"]
+    BC --> EC([สิ้นสุด])
+    DC -->|ไม่ใช่| D0{"การชำระเงิน<br>ตรวจสอบแล้ว?"}
+    D0 -->|ไม่ใช่| B0["แสดงป้าย ยืนยันการชำระเงินก่อนดำเนินงาน<br>และซ่อนปุ่ม รับรถเข้าคิว"]
+    B0 --> E0([รอยืนยันการชำระเงิน])
+    D0 -->|ใช่| M3[/"แอดมินกด รับรถเข้าคิว"/]
+    M3 --> B3["บันทึกสถานะ: รับรถเข้าคิวแล้ว<br>และแจ้งเตือนลูกค้า"]
+    B3 --> M4[/"แอดมินกด เริ่มให้บริการ"/]
+    M4 --> B4["บันทึกสถานะ: กำลังให้บริการ<br>และแจ้งเตือนลูกค้า"]
+    B4 --> M5[/"แอดมินกด พร้อมรับรถ"/]
+    M5 --> B5["บันทึกสถานะ: พร้อมรับรถแล้ว<br>และซ่อนปุ่ม ยกเลิกการจอง"]
+    B5 --> B6["คำนวณแต้มสะสม<br>1 แต้ม ต่อทุก 25 บาท<br>แล้วเพิ่มให้ลูกค้า"]
+    B6 --> B7["แจ้งเตือนลูกค้าให้มารับรถ"]
+    B7 --> E([จบงาน])
+
+    DBB[("ตารางการจอง")]
+    DBU[("ข้อมูลลูกค้า<br>และแต้มสะสม")]
+    DBN[("ตารางการแจ้งเตือน")]
+    DBB -.->|อ่าน| B1
+    BC -.->|บันทึก| DBB
+    B3 -.->|บันทึก| DBB
+    B4 -.->|บันทึก| DBB
+    B5 -.->|บันทึก| DBB
+    B6 -.->|บันทึก| DBU
+    B7 -.->|บันทึก| DBN
+
+    linkStyle default interpolate stepAfter
 ```
+### ฟังก์ชันลูกค้าติดตามสถานะคิว
+```mermaid
+%%{init: {"flowchart": {"curve": "stepAfter"}}}%%
+flowchart TD
+    S([เริ่มต้น]) --> C1[/"ลูกค้าเปิดเมนู ติดตามสถานะ"/]
+    C1 --> L{"เข้าสู่ระบบแล้ว?"}
+    L -->|ไม่ใช่| C0[/"ลูกค้าเข้าสู่ระบบ"/]
+    C0 --> L
+    L -->|ใช่| B1["ระบบดึงรายการจองของลูกค้า"]
+    B1 --> D1{"มีรายการจอง?"}
+    D1 -->|ไม่มี| BN["แจ้งว่ายังไม่มีรายการจอง<br>และแสดงปุ่มไปหน้าจองคิว"]
+    BN --> EN([สิ้นสุด])
+    D1 -->|มี| C2[/"ลูกค้าเลือกรหัสการจอง"/]
+    C2 --> B2["ดึงสถานะการจองและการชำระเงินล่าสุด"]
+    B2 --> D2{"การจองถูกยกเลิก?"}
+    D2 -->|ใช่| BX["แสดงสถานะ ยกเลิกการจอง"]
+    BX --> EX([สิ้นสุด])
+    D2 -->|ไม่ใช่| D3{"สถานะการชำระเงิน"}
+    D3 -->|ยังไม่ชำระ / ไม่ผ่านการตรวจสอบ| BP["แสดงปุ่ม ชำระเงินต่อ"]
+    BP --> C3[/"ลูกค้ากด ชำระเงินต่อ"/]
+    C3 --> EP([ไปหน้าชำระเงิน])
+    D3 -->|รอตรวจสอบ| BW["แสดง รอตรวจสอบ<br>รอระบบหรือแอดมินยืนยัน"]
+    D3 -->|ตรวจสอบแล้ว| B3["แสดงแถบความคืบหน้า 4 ขั้น<br>รอยืนยันการจอง → รับรถเข้าคิวแล้ว<br>→ กำลังให้บริการ → พร้อมรับรถแล้ว"]
+    B3 --> D4{"พร้อมรับรถแล้ว?"}
+    D4 -->|ใช่| BR["แสดง พร้อมรับรถแล้ว<br>และแต้มสะสมที่ได้รับ"]
+    BR --> C4[/"ลูกค้ามารับรถที่ร้าน"/]
+    C4 --> E([สิ้นสุด])
+    D4 -->|ไม่ใช่| W["รอ 15 วินาที<br>แล้วอัปเดตอัตโนมัติ"]
+    BW --> W
+    W --> B2
 
-ข้อมูล MySQL และไฟล์สลิปจะอยู่ใน Docker volumes จึงไม่หายเมื่อหยุด container ปกติ
+    DBB[("ตารางการจอง")]
+    DBB -.->|อ่าน| B1
+    DBB -.->|อ่าน| B2
 
-## Deploy บน VPS ที่มีโปรเจกต์อื่นอยู่แล้ว
-
-ไฟล์ `docker-compose.production.yml` แยก MySQL และ uploads เป็น Docker volumes ของโปรเจกต์ `carwash-queue-live`; ไม่เปิดพอร์ตฐานข้อมูล, API หรือ phpMyAdmin ออกอินเทอร์เน็ต และผูกหน้าเว็บไว้ที่ `127.0.0.1:16200` เพื่อให้ Nginx ของ VPS ส่งต่อจากโดเมน/subdomain แยก การตั้งค่านี้ไม่รีเซ็ตเครื่องและไม่หยุด Compose project อื่น
-
-ก่อน deploy ต้องเตรียม `carwash.carcareku.tech` ให้ชี้ A record ไปยัง IP ของ VPS และตั้ง Nginx virtual host จาก `deploy/nginx-carwash.conf.example` โดยใช้ไฟล์ตั้งค่า TLS ของ VPS ห้ามแก้ A record ของโดเมนหลักหรือแทนที่ config ของโปรเจกต์เดิม
-
-GitHub Actions จะ build และ push image ไป GHCR เมื่อ push เข้า `main`; การ deploy ทำเมื่อกด **Actions → CarWash Queue CI/CD → Run workflow** เท่านั้น ต้องตั้งค่าใน **Settings → Secrets and variables → Actions** ดังนี้:
-
-- Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`, `GHCR_PULL_TOKEN` (กำหนดสิทธิ์ `read:packages`) และ `PRODUCTION_ENV` (เนื้อหาทั้งหมดจากไฟล์ `.env.production`)
-- Variables: `APP_URL` (URL HTTPS เต็มของแอป) และ `GOOGLE_CLIENT_ID`
-
-ผู้ใช้บน VPS ต้องมี Docker/Compose และ SSH key ที่ตรงกับ `VPS_SSH_KEY`; key สาธารณะต้องอยู่ใน `authorized_keys` ของผู้ใช้นั้น และผู้ใช้ต้องเรียก Docker ได้ Workflow จะเขียน `PRODUCTION_ENV` เป็นไฟล์ permission จำกัดบน VPS ก่อนเริ่ม container `APP_URL` ที่ยังว่างจะทำให้ขั้น deploy ถูกข้าม แต่ build image ยังทำงานได้
-
-## Deploy หน้าเว็บด้วย Vercel และใช้ Express + MySQL ของเราเอง
-
-ไฟล์ `client/vercel.json` เตรียมค่า Build และการเปิดหน้า React Router ให้แล้ว โดยตั้งค่าใน Vercel ดังนี้:
-
-1. Import repository `Patipan26/carwash-queue` เข้า Vercel
-2. ตั้ง **Root Directory** เป็น `client`
-3. ตั้งค่า Environment Variable:
-
-```text
-VITE_API_URL=https://โดเมนของ-Express/api
-VITE_GOOGLE_CLIENT_ID=เลข Client ID ของ Google
-```
-
-4. Deploy แล้วจด URL ของหน้าเว็บ เช่น `https://carwash-queue.vercel.app`
-5. ฝั่ง Express ตั้งค่า `CLIENT_ORIGIN` ให้ตรงกับ URL ของ Vercel
-6. หาก Express อยู่คนละโดเมนกับ Vercel ต้องเปิด HTTPS และตั้ง `NODE_ENV=production` เพื่อให้ session cookie ทำงานข้ามโดเมนได้
-
-ตัวอย่างค่าฝั่ง Express:
-
-```text
-NODE_ENV=production
-CLIENT_ORIGIN=https://carwash-queue.vercel.app
-```
-
-ถ้าใช้ Docker รัน Express และ MySQL บนเครื่อง/Server ของเรา ให้ใส่ค่าข้างต้นในไฟล์ `.env` ที่อยู่โฟลเดอร์ราก แล้วเริ่มเฉพาะ API กับฐานข้อมูลได้ด้วย:
-
-```powershell
-Copy-Item '.env.docker.example' '.env'
-notepad '.env'
-docker compose up -d --build db api
-```
-
-อย่าใช้ `CLIENT_ORIGIN=http://localhost:...` กับหน้าเว็บที่อยู่บน Vercel เพราะ Vercel จะเรียก `localhost` จากเครื่องของผู้เปิดเว็บ ไม่ใช่เครื่องที่รัน Express
-
-Vercel ใช้สำหรับ Frontend เท่านั้น ส่วน Express ต้องรันบน Server/VPS/บริการ Backend ที่เข้าถึงได้จากอินเทอร์เน็ต และ MySQL ต้องอยู่บนเครื่องหรือบริการฐานข้อมูลที่ Express เชื่อมต่อได้ ห้ามใส่รหัสผ่านฐานข้อมูลใน Vercel ฝั่ง `VITE_*` เพราะตัวแปรเหล่านี้ถูกส่งไปอยู่ใน JavaScript ของผู้ใช้
-
-## Google Login
-
-ระบบใช้ Google Identity Services และให้ Express ตรวจสอบ ID token ก่อนออก cookie ของระบบเอง ไม่ใช้ Firebase
-
-1. สร้าง OAuth 2.0 Client ID แบบ **Web application** ใน Google Cloud
-2. เพิ่ม Authorized JavaScript origins สำหรับ URL ที่ใช้ทดสอบ เช่น `http://localhost:6200` และ URL Vercel จริง
-3. ใส่ Client ID ใน `client/.env` และ `server/.env`:
-
-```text
-# client/.env
-VITE_GOOGLE_CLIENT_ID=เลข Client ID ของ Google
-
-# server/.env
-GOOGLE_CLIENT_ID=เลข Client ID เดียวกัน
-```
-
-ถ้าใช้ Docker ให้ใส่ `GOOGLE_CLIENT_ID` ในไฟล์ `.env` ที่โฟลเดอร์รากไฟล์เดียว แล้ว Docker จะส่งค่าเดียวกันให้ทั้ง API และหน้าเว็บตอน Build
-
-4. ถ้าใช้ฐานข้อมูลเดิม ให้รัน migration Google Login ครั้งเดียว:
-
-```powershell
-Get-Content '.\database\migrations\003_google_auth.sql' | docker exec -i carwash-mysql mysql -ucarwash -pcarwash_dev_password carwash_queue
-```
-
-5. Restart API และ Frontend แล้วทดสอบปุ่ม Google ในหน้าเข้าสู่ระบบ
-
-Client ID เป็นข้อมูลที่ฝั่งหน้าเว็บใช้ได้ แต่ห้ามเปิดเผยค่า `JWT_SECRET` หรือรหัสผ่านฐานข้อมูล Google จะส่ง ID token กลับมาให้หน้าเว็บ และ Backend จะตรวจสอบลายเซ็น, ผู้ให้บริการ, อายุ token และ Client ID ก่อนสร้าง/เชื่อมบัญชีใน MySQL ตามแนวทาง Google ([การตรวจสอบ Google ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token))
-
-หลังสมัครบัญชีลูกค้าแล้ว หากต้องการกำหนดบัญชีเป็นแอดมิน ให้รัน SQL นี้โดยเปลี่ยนอีเมลให้ตรงกับบัญชี:
-
-```sql
-USE carwash_queue;
-UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
-```
-
-## แต้มสะสมและแจ้งเตือนสถานะ
-
-ลูกค้ารับ 1 แต้มต่อยอดจองทุก 25 บาท เมื่อแอดมินเปลี่ยนสถานะเป็น `completed` แต้มจะแสดงในหน้ารายการของฉัน และระบบป้องกันการให้แต้มซ้ำสำหรับการจองเดิม หน้ารายการของฉันตรวจสอบการเปลี่ยนสถานะทุก 15 วินาทีและแสดง popup เมื่อพบการเปลี่ยนแปลง
-
-ถ้าใช้ฐานข้อมูลเดิม ให้รัน migration นี้ครั้งเดียวก่อนใช้งาน:
-
-```powershell
-Get-Content '.\database\migrations\004_loyalty_points.sql' | docker exec -i carwash-mysql mysql -ucarwash -pcarwash_dev_password carwash_queue
-```
-
-ฟีเจอร์โปรไฟล์และการแจ้งเตือนต้องเพิ่มตารางอีกชุด ให้รัน migration นี้ครั้งเดียวด้วย:
-
-```powershell
-Get-Content '.\database\migrations\005_profile_notifications.sql' | docker exec -i carwash-mysql mysql -ucarwash -pcarwash_dev_password carwash_queue
-```
-
-ลูกค้าดูและทำเครื่องหมายการแจ้งเตือนว่าอ่านแล้วได้ที่เมนู **แจ้งเตือน** ส่วนเมนู **โปรไฟล์** ใช้แก้ชื่อและเบอร์โทร เปลี่ยนรหัสผ่าน เพิ่มรถ ดูแต้มสะสม สถิติ และรายการจองล่าสุด
-
-## หมายเหตุเรื่องการชำระเงิน
-
-หน้า payment สร้าง QR PromptPay จาก `PROMPTPAY_NUMBER` และส่งรูปสลิปให้ Slip2Go ตรวจอัตโนมัติ ก่อนจะบันทึกสถานะชำระเงินเป็น `verified` เท่านั้น สลิปที่ไม่มี QR, ตรวจไม่พบ, ซ้ำ, ยอดไม่ตรง หรือบัญชีผู้รับไม่ตรงจะถูกปฏิเสธและไฟล์จะไม่ถูกเก็บ
-
-ก่อนเปิดใช้ ให้ตั้งค่าเหล่านี้ใน `.env` ที่โฟลเดอร์ราก (หรือ `server/.env` เมื่อติดตั้ง API แยก):
-
-```dotenv
-SLIP2GO_SECRET=วาง Secret Key จากหน้า API Connect > Authentication
-SLIP2GO_RECEIVER_ACCOUNT_TYPE=02001
-SLIP2GO_RECEIVER_ACCOUNT_NUMBER=เบอร์_PromptPay_ที่รับเงิน
-```
-
-`02001` คือ PromptPay เบอร์โทรศัพท์ หากรับเงินด้วยบัญชีชนิดอื่นให้ตั้ง `SLIP2GO_RECEIVER_ACCOUNT_TYPE` และเลขบัญชีให้ตรงกับร้าน ค่าเลขบัญชีสามารถเว้นว่างเพื่อใช้ `PROMPTPAY_NUMBER` ได้ จากนั้นตั้ง IP ของเซิร์ฟเวอร์ใน Slip2Go IP Whitelist และ rebuild API:
-
-```powershell
-docker compose up -d --build api
-```
-
-API Secret ใช้ใน backend เท่านั้น อย่าใส่ใน client หรือ commit ค่า Secret จริงขึ้น Git หากไม่ได้ตั้ง Secret หรือบัญชีผู้รับ ระบบจะปิดการรับสลิปไว้และแจ้งให้ตั้งค่าก่อน
-
-ประวัติการตรวจสลิปจาก Slip2Go จะถูกบันทึกในตาราง `slip_verifications` และผูกกับรายการจอง โดยเก็บผลตรวจ รหัสตอบกลับ ยอดเงิน `referenceId` และ `transRef` ส่วนรายการที่ผ่านจะเก็บเลขอ้างอิงไว้ใน `bookings` ด้วย แอดมินเปิดดูได้จากหน้า **Admin > ประวัติผลตรวจ** ในแต่ละรายการจอง หากใช้ฐานข้อมูลเดิม ให้รัน migration นี้ครั้งเดียวก่อน rebuild API:
-
-```powershell
-Get-Content '.\database\migrations\008_slip_verification_history.sql' | docker exec -i carwash-mysql mysql -ucarwash -pcarwash_dev_password carwash_queue
-docker compose up -d --build api client
-```
-
-ระบบจะเริ่มเก็บตั้งแต่การตรวจครั้งถัดไป ประวัติการตรวจเดิมที่ไม่ได้บันทึก `referenceId` ไว้จะไม่สามารถเติมกลับจากฐานข้อมูลเราได้
-
-รายการที่มีสถานะ **รอตรวจสอบ** และแนบสลิปไว้ จะแสดงปุ่ม **อนุมัติชำระเงิน** และ **ปฏิเสธสลิป** ในหน้าแอดมิน เมื่อตรวจสอบด้วยตนเองแล้วอนุมัติ ระบบจะคำนวณ VAT 7% และแจ้งลูกค้า หากปฏิเสธ ลูกค้าจะได้รับแจ้งให้ส่งสลิปใหม่ ระบบจะไม่ให้เลื่อนงานไปขั้นรับรถ/กำลังให้บริการ/เสร็จสิ้นจนกว่าสถานะชำระเงินเป็น `verified`
-
-ไฟล์สลิปและไฟล์แนบไม่ได้เปิดเป็น URL สาธารณะแล้ว การเปิดไฟล์ต้องผ่าน API ที่ตรวจ session และสิทธิ์เจ้าของรายการหรือแอดมิน
-
-## กติกาข้อมูลหลัก
-
-- Standard Wash: ฿250
-- Premium Wash: ฿450
-- Full Detailing: ฿1,200
-- ค่าเริ่มต้นจำกัด 1 คันต่อช่วงเวลา ปรับได้ด้วย `BOOKING_SLOT_CAPACITY`
-- ไม่ใช้ Firebase และไม่ให้ React ติดต่อ MySQL โดยตรง
-
-## กฎการจอง
-
-- Backend รับเฉพาะช่วงเวลา 09:00–10:00, 10:00–11:00, 11:00–12:00, 13:00–14:00, 14:00–15:00 และ 15:00–16:00
-- ปฏิเสธวันที่ผ่านมาแล้ว โดยอ้างอิงเวลา Asia/Bangkok
-- ปิดรับการจองทุกวันอาทิตย์ทั้งหน้าเว็บและ API
-- สถานะการจอง: `pending`, `confirmed`, `in_service`, `completed`, `cancelled`
-- นับรายการ `pending`, `confirmed` และ `in_service` เป็นคิวที่ใช้ความจุ ส่วน `cancelled` และ `completed` ไม่กินคิว
-- Backend อ่านราคาบริการและบริการเสริมจาก MySQL แล้วคำนวณยอดรวมเอง ไม่เชื่อราคาจากหน้าเว็บ
-- Endpoint `GET /api/bookings/availability?date=YYYY-MM-DD` ใช้ดูจำนวนคิวคงเหลือของแต่ละช่วงเวลา
-- ใช้ MySQL advisory lock ป้องกันคำขอสองรายการจองที่ว่างสุดท้ายพร้อมกัน
-
-หากใช้ฐานข้อมูลเดิม ให้รัน migration เพิ่ม index ครั้งเดียว:
-
-```powershell
-Get-Content '.\database\migrations\002_booking_slot_index.sql' | docker exec -i carwash-mysql mysql -ucarwash -pcarwash_dev_password carwash_queue
-```
-
-ถ้าใช้ฐานข้อมูลเดิม ให้เพิ่มสถานะ `in_service` สำหรับหน้า Tracking ด้วย:
-
-```powershell
-Get-Content '.\database\migrations\006_booking_in_service_status.sql' | docker exec -i carwash-mysql mysql -ucarwash -pcarwash_dev_password carwash_queue
-```
-
-ตั้ง `PROMPTPAY_NUMBER` ใน `.env` เพื่อแสดง QR พร้อมยอดเงินที่ต้องชำระ โค้ดส่วนลด `PROMO10` ลด 10% และระบบคำนวณ VAT 7% จากยอดหลังหักส่วนลด
-
-ฐานข้อมูลเดิมต้องเพิ่มช่องสรุปยอดชำระด้วย migration นี้:
-
-```powershell
-Get-Content '.\database\migrations\007_payment_summary.sql' | docker exec -i carwash-mysql mysql -ucarwash -pcarwash_dev_password carwash_queue
+    linkStyle default interpolate stepAfter
 ```
